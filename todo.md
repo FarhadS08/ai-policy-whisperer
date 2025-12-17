@@ -62,3 +62,15 @@
 - [x] Remove Manus auth routes and middleware
 - [x] Update server to use Clerk JWT verification (clerkAuth.ts created)
 - [x] Ensure NO Manus references remain in codebase
+
+## URGENT - Complete Manus Removal - December 17, 2025
+- [x] Search ALL files for manus, oauth, OAUTH_SERVER_URL references
+- [x] Remove vite-plugin-manus-runtime from package.json
+- [x] Remove ManusDialog.tsx component
+- [x] Remove vite.config.ts Manus plugin
+- [x] Remove main.tsx getLoginUrl redirect
+- [x] Update DashboardLayout to use Clerk SignInButton
+- [x] Remove const.ts with getLoginUrl function
+- [x] Update env.ts to remove Manus OAuth references
+- [x] Rewrite db.ts to disable Drizzle/MySQL
+- [x] Verify published site shows Clerk auth only (dev server confirmed working)
