@@ -1,122 +1,192 @@
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
-import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
-import { 
-  createConversation, 
-  getConversationsByUser, 
-  getConversationById, 
-  addMessage, 
-  getMessagesByConversation,
-  updateConversationTitle,
-  deleteConversation
-} from "./db";
+import { createClient } from "@supabase/supabase-js";
+
+// Initialize Supabase client for server-side operations
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('[Supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY');
+}
+
+const supabase = createClient(supabaseUrl || '', supabaseKey || '');
 
 export const appRouter = router({
-  system: systemRouter,
+  // Auth routes - using Clerk, no server-side session management needed
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return { success: true } as const;
-    }),
+    // Logout is handled by Clerk on the frontend
   }),
 
-  // Conversation routes
+  // Conversation routes - using Supabase directly
   conversations: router({
     // Create a new conversation
     create: protectedProcedure
       .input(z.object({
-        supabaseId: z.string(),
         title: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        return await createConversation({
-          supabaseId: input.supabaseId,
-          userId: ctx.user.id,
-          title: input.title || null,
-        });
+        const { data, error } = await supabase
+          .from('conversations')
+          .insert({
+            user_id: ctx.user.id, // Clerk user ID (string)
+            title: input.title || 'New Conversation',
+          })
+          .select()
+          .single();
+
+        if (error) throw new Error(error.message);
+        return data;
       }),
 
     // Get all conversations for the current user
     list: protectedProcedure.query(async ({ ctx }) => {
-      return await getConversationsByUser(ctx.user.id);
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('user_id', ctx.user.id)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw new Error(error.message);
+      return data || [];
     }),
 
     // Get a specific conversation with messages
     get: protectedProcedure
-      .input(z.object({ id: z.number() }))
+      .input(z.object({ id: z.string().uuid() }))
       .query(async ({ ctx, input }) => {
-        const conversation = await getConversationById(input.id);
-        if (!conversation || conversation.userId !== ctx.user.id) {
+        // Get conversation
+        const { data: conversation, error: convError } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('id', input.id)
+          .eq('user_id', ctx.user.id)
+          .single();
+
+        if (convError || !conversation) {
           throw new Error('Conversation not found');
         }
-        const messages = await getMessagesByConversation(input.id);
-        return { conversation, messages };
+
+        // Get messages
+        const { data: messages, error: msgError } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', input.id)
+          .order('created_at', { ascending: true });
+
+        if (msgError) throw new Error(msgError.message);
+
+        return { conversation, messages: messages || [] };
       }),
 
     // Update conversation title
     updateTitle: protectedProcedure
       .input(z.object({
-        id: z.number(),
+        id: z.string().uuid(),
         title: z.string(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const conversation = await getConversationById(input.id);
-        if (!conversation || conversation.userId !== ctx.user.id) {
-          throw new Error('Conversation not found');
-        }
-        await updateConversationTitle(input.id, input.title);
+        const { error } = await supabase
+          .from('conversations')
+          .update({ title: input.title, updated_at: new Date().toISOString() })
+          .eq('id', input.id)
+          .eq('user_id', ctx.user.id);
+
+        if (error) throw new Error(error.message);
         return { success: true };
       }),
 
     // Delete a conversation
     delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
+      .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
-        const conversation = await getConversationById(input.id);
-        if (!conversation || conversation.userId !== ctx.user.id) {
-          throw new Error('Conversation not found');
-        }
-        await deleteConversation(input.id);
+        // Delete messages first
+        await supabase
+          .from('messages')
+          .delete()
+          .eq('conversation_id', input.id);
+
+        // Delete conversation
+        const { error } = await supabase
+          .from('conversations')
+          .delete()
+          .eq('id', input.id)
+          .eq('user_id', ctx.user.id);
+
+        if (error) throw new Error(error.message);
         return { success: true };
       }),
   }),
 
-  // Message routes
+  // Message routes - using Supabase directly
   messages: router({
     // Add a message to a conversation
     add: protectedProcedure
       .input(z.object({
-        conversationId: z.number(),
+        conversationId: z.string().uuid(),
         role: z.enum(['user', 'assistant']),
         content: z.string(),
-        audioUrl: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const conversation = await getConversationById(input.conversationId);
-        if (!conversation || conversation.userId !== ctx.user.id) {
+        // Verify conversation belongs to user
+        const { data: conv, error: convError } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('id', input.conversationId)
+          .eq('user_id', ctx.user.id)
+          .single();
+
+        if (convError || !conv) {
           throw new Error('Conversation not found');
         }
-        return await addMessage({
-          conversationId: input.conversationId,
-          role: input.role,
-          content: input.content,
-          audioUrl: input.audioUrl || null,
-        });
+
+        // Add message
+        const { data, error } = await supabase
+          .from('messages')
+          .insert({
+            conversation_id: input.conversationId,
+            role: input.role,
+            content: input.content,
+          })
+          .select()
+          .single();
+
+        if (error) throw new Error(error.message);
+
+        // Update conversation timestamp
+        await supabase
+          .from('conversations')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', input.conversationId);
+
+        return data;
       }),
 
     // Get messages for a conversation
     list: protectedProcedure
-      .input(z.object({ conversationId: z.number() }))
+      .input(z.object({ conversationId: z.string().uuid() }))
       .query(async ({ ctx, input }) => {
-        const conversation = await getConversationById(input.conversationId);
-        if (!conversation || conversation.userId !== ctx.user.id) {
+        // Verify conversation belongs to user
+        const { data: conv, error: convError } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('id', input.conversationId)
+          .eq('user_id', ctx.user.id)
+          .single();
+
+        if (convError || !conv) {
           throw new Error('Conversation not found');
         }
-        return await getMessagesByConversation(input.conversationId);
+
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', input.conversationId)
+          .order('created_at', { ascending: true });
+
+        if (error) throw new Error(error.message);
+        return data || [];
       }),
   }),
 });

@@ -52,3 +52,13 @@
 - [x] Fix conversation display under voice button on home page
 - [x] Ensure messages appear in conversation details
 - [x] Properly integrate ElevenLabs voice agent with Supabase persistence
+
+## UI Updates - December 17, 2025
+- [ ] Remove phone number option from Clerk sign-in/sign-up UI
+
+## CRITICAL - Remove Manus Code - December 17, 2025
+- [x] Remove ALL Manus OAuth code from server/_core (oauth.ts, sdk.ts, manusTypes.ts deleted)
+- [x] Remove Manus database (Drizzle/MySQL) - use ONLY Supabase
+- [x] Remove Manus auth routes and middleware
+- [x] Update server to use Clerk JWT verification (clerkAuth.ts created)
+- [x] Ensure NO Manus references remain in codebase

@@ -1,20 +1,20 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
-import type { User } from "../../drizzle/schema";
-import { sdk } from "./sdk";
+import { verifyClerkSession, type ClerkUser } from "./clerkAuth";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
-  user: User | null;
+  user: ClerkUser | null;
 };
 
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
-  let user: User | null = null;
+  let user: ClerkUser | null = null;
 
   try {
-    user = await sdk.authenticateRequest(opts.req);
+    // Use Clerk authentication ONLY - no Manus OAuth
+    user = await verifyClerkSession(opts.req);
   } catch (error) {
     // Authentication is optional for public procedures.
     user = null;
