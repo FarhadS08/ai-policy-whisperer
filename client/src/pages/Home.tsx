@@ -3,7 +3,7 @@ import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@cl
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { VoiceButton } from "@/components/VoiceButton";
+import { VoiceOrbButton } from "@/components/VoiceOrbButton";
 import { useVoiceAgent, TranscriptEntry } from "@/hooks/useVoiceAgent";
 import { Icon3D, FloatingOrb, GlassOrb } from "@/components/Icon3D";
 import { HeroIllustration } from "@/components/HeroIllustration";
@@ -336,7 +336,7 @@ export default function Home() {
                 <CardContent className="p-6">
                   {/* Voice Button */}
                   <div className="flex flex-col items-center py-4">
-                    <VoiceButton
+                    <VoiceOrbButton
                       status={status}
                       isSessionActive={isSessionActive}
                       onClick={isAuthenticated ? toggleSession : undefined}
