@@ -1,6 +1,7 @@
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
+import { generateConversationTitle, hasEnoughContextForTitle } from "./titleGeneration";
 
 // Initialize Supabase client for server-side operations
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -95,6 +96,59 @@ export const appRouter = router({
 
         if (error) throw new Error(error.message);
         return { success: true };
+      }),
+
+    // Generate AI title for a conversation
+    generateTitle: protectedProcedure
+      .input(z.object({
+        id: z.string().uuid(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Get conversation to verify ownership
+        const { data: conversation, error: convError } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('id', input.id)
+          .eq('user_id', ctx.user.id)
+          .single();
+
+        if (convError || !conversation) {
+          throw new Error('Conversation not found');
+        }
+
+        // Get messages for context
+        const { data: messages, error: msgError } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', input.id)
+          .order('created_at', { ascending: true });
+
+        if (msgError) throw new Error(msgError.message);
+
+        const messageList = messages || [];
+
+        // Check if we have enough context
+        if (!hasEnoughContextForTitle(messageList)) {
+          return { 
+            success: false, 
+            title: conversation.title,
+            reason: 'Not enough conversation context yet'
+          };
+        }
+
+        // Generate AI title
+        const newTitle = await generateConversationTitle(messageList);
+
+        // Update the conversation with the new title
+        const { error: updateError } = await supabase
+          .from('conversations')
+          .update({ title: newTitle, updated_at: new Date().toISOString() })
+          .eq('id', input.id)
+          .eq('user_id', ctx.user.id);
+
+        if (updateError) throw new Error(updateError.message);
+
+        return { success: true, title: newTitle };
       }),
 
     // Delete a conversation

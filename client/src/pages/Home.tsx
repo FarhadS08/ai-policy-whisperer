@@ -8,6 +8,7 @@ import { useVoiceAgent, TranscriptEntry } from "@/hooks/useVoiceAgent";
 import { Icon3D, FloatingOrb, GlassOrb } from "@/components/Icon3D";
 import { HeroIllustration } from "@/components/HeroIllustration";
 import { motion, AnimatePresence } from "framer-motion";
+import { trpc } from "@/lib/trpc";
 import { 
   Moon, 
   Sun,
@@ -27,7 +28,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Link } from "wouter";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import * as supabaseService from "@/services/supabaseService";
 
 export default function Home() {
@@ -39,6 +40,21 @@ export default function Home() {
   const conversationIdRef = useRef<string | null>(null);
   const savedMessagesCountRef = useRef<number>(0);
   const isCreatingConversationRef = useRef<boolean>(false);
+  const titleGeneratedRef = useRef<boolean>(false);
+
+  // tRPC mutation for generating AI title
+  const generateTitleMutation = trpc.conversations.generateTitle.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        console.log('[Home] AI title generated:', data.title);
+      } else {
+        console.log('[Home] Title generation skipped:', data.reason);
+      }
+    },
+    onError: (error) => {
+      console.error('[Home] Error generating AI title:', error);
+    }
+  });
 
   const handleTranscriptUpdate = useCallback(async (transcript: TranscriptEntry[]) => {
     console.log('[Home] handleTranscriptUpdate called, transcript length:', transcript.length);
@@ -76,10 +92,10 @@ export default function Home() {
       console.log('[Home] Creating new conversation...');
       
       try {
-        const firstMessage = transcript[0];
-        const title = firstMessage.content.slice(0, 50) + (firstMessage.content.length > 50 ? '...' : '');
+        // Use a temporary title - will be replaced by AI-generated title on session end
+        const tempTitle = "New Conversation";
         
-        const conv = await supabaseService.createConversation(user.id, title);
+        const conv = await supabaseService.createConversation(user.id, tempTitle);
         
         if (conv) {
           console.log('[Home] Conversation created:', conv.id);
@@ -126,19 +142,56 @@ export default function Home() {
     }
   }, [user, isAuthenticated]);
 
+  // Handle session end - generate AI title
+  const handleSessionEnd = useCallback(async (transcript: TranscriptEntry[]) => {
+    console.log('[Home] handleSessionEnd called, transcript length:', transcript.length);
+    console.log('[Home] Conversation ID:', conversationIdRef.current);
+    console.log('[Home] Title already generated:', titleGeneratedRef.current);
+
+    // Only generate title once per conversation and if we have a conversation ID
+    if (!conversationIdRef.current || titleGeneratedRef.current) {
+      console.log('[Home] Skipping title generation - no conversation or already generated');
+      return;
+    }
+
+    // Need at least 2 messages (user + assistant) for meaningful title
+    if (transcript.length < 2) {
+      console.log('[Home] Not enough messages for AI title generation');
+      return;
+    }
+
+    // Mark as generated to prevent duplicate calls
+    titleGeneratedRef.current = true;
+
+    console.log('[Home] Generating AI title for conversation:', conversationIdRef.current);
+    
+    try {
+      generateTitleMutation.mutate({ id: conversationIdRef.current });
+    } catch (error) {
+      console.error('[Home] Error triggering title generation:', error);
+    }
+  }, [generateTitleMutation]);
+
+  // Memoize voice agent options to prevent recreation on every render
+  const voiceAgentOptions = useMemo(() => ({
+    onTranscriptUpdate: handleTranscriptUpdate,
+    onSessionEnd: handleSessionEnd
+  }), [handleTranscriptUpdate, handleSessionEnd]);
+
   const { 
     status, 
     isSessionActive, 
     error, 
     toggleSession,
     clearTranscript 
-  } = useVoiceAgent(handleTranscriptUpdate);
+  } = useVoiceAgent(voiceAgentOptions);
 
   const startNewSession = useCallback(() => {
     // Reset conversation tracking for new session
     conversationIdRef.current = null;
     savedMessagesCountRef.current = 0;
     isCreatingConversationRef.current = false;
+    titleGeneratedRef.current = false;
     setDisplayMessages([]);
   }, [clearTranscript]);
 
@@ -280,61 +333,73 @@ export default function Home() {
               transition={{ duration: 0.6 }}
               className="space-y-6"
             >
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass text-sm font-medium">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span>Voice-Powered AI Assistant</span>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 text-sm font-medium">
+                <Sparkles className="w-4 h-4" />
+                AI-Powered Policy Assistant
               </div>
               
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
                 Navigate AI Policies with{" "}
-                <span className="gradient-text">Confidence</span>
+                <span className="text-gradient">Confidence</span>
               </h1>
               
-              <p className="text-lg text-muted-foreground max-w-lg">
-                Ask questions about AI platform policies, regulatory rules, and constraints. 
-                Get clear, contextual explanations through natural voice conversations.
+              <p className="text-lg text-muted-foreground max-w-xl">
+                Get instant, accurate answers about AI platform policies, regulations, and guidelines. 
+                Just ask in plain language—we'll handle the complexity.
               </p>
-
-              <SignedOut>
-                <div className="flex flex-col sm:flex-row gap-4 pt-4">
+              
+              <div className="flex flex-wrap gap-4">
+                <SignedOut>
                   <SignUpButton mode="modal">
-                    <Button size="lg" className="w-full sm:w-auto gap-2 btn-gradient rounded-full px-8 h-12 text-base">
-                      Get Started Free
+                    <Button size="lg" className="gap-2 btn-gradient rounded-full px-8">
+                      Start Free
                       <ArrowRight className="w-4 h-4" />
                     </Button>
                   </SignUpButton>
-                  <Button size="lg" variant="outline" className="w-full sm:w-auto rounded-full px-8 h-12 text-base glass">
+                </SignedOut>
+                <SignedIn>
+                  <Button 
+                    size="lg" 
+                    className="gap-2 btn-gradient rounded-full px-8"
+                    onClick={() => {
+                      startNewSession();
+                      toggleSession();
+                    }}
+                  >
+                    Start Conversation
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </SignedIn>
+                <Link href="#features">
+                  <Button size="lg" variant="outline" className="rounded-full px-8">
                     Learn More
                   </Button>
+                </Link>
+              </div>
+              
+              {/* Trust indicators */}
+              <div className="flex items-center gap-6 pt-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Check className="w-4 h-4 text-green-500" />
+                  No credit card required
                 </div>
-              </SignedOut>
-
-              <SignedIn>
-                <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                  <Link href="/history">
-                    <Button size="lg" variant="outline" className="w-full sm:w-auto gap-2 rounded-full px-8 h-12 text-base glass">
-                      <History className="w-4 h-4" />
-                      View History
-                    </Button>
-                  </Link>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Check className="w-4 h-4 text-green-500" />
+                  Instant access
                 </div>
-              </SignedIn>
+              </div>
             </motion.div>
 
-            {/* Right Column - Hero Illustration & Voice Interface */}
+            {/* Right Column - Voice Interface */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="flex flex-col items-center relative"
+              className="relative"
             >
-              {/* CSS-based Hero Illustration */}
-              <HeroIllustration />
-
-              {/* Voice Interface Card */}
-              <Card className="w-full max-w-md glass-strong border-0 overflow-hidden rounded-2xl shadow-elevated -mt-16 relative z-10">
+              <Card className="glass-card overflow-hidden">
                 <CardContent className="p-6">
-                  {/* Voice Button */}
+                  {/* Voice Interface */}
                   <div className="flex flex-col items-center py-4">
                     <VoiceOrbButton
                       status={status}
@@ -344,13 +409,9 @@ export default function Home() {
                     />
                     
                     {error && (
-                      <motion.p
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="text-sm text-destructive mt-2 text-center"
-                      >
+                      <p className="text-sm text-red-500 mt-4 text-center">
                         {error}
-                      </motion.p>
+                      </p>
                     )}
                     
                     <p className="text-sm text-muted-foreground mt-4 text-center">
@@ -361,92 +422,92 @@ export default function Home() {
                           : "Tap to start voice session"}
                     </p>
                   </div>
-
-                  {/* Conversation Display */}
-                  <SignedIn>
-                    <div className="border-t border-border/50 pt-4 mt-2">
-                      <ScrollArea className="h-[200px]">
-                        {displayMessages.length === 0 ? (
-                          <div className="flex flex-col items-center justify-center h-full text-center p-4">
-                            <Bot className="w-10 h-10 text-muted-foreground/30 mb-3" />
-                            <p className="text-sm text-muted-foreground">
-                              Start a conversation by pressing the microphone button
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-3 p-2">
-                            <AnimatePresence mode="popLayout">
-                              {displayMessages.map((msg, index) => (
-                                <motion.div
-                                  key={index}
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: -10 }}
-                                  className={`flex items-start gap-2 ${
-                                    msg.role === 'user' ? 'justify-end' : 'justify-start'
+                  
+                  {/* Transcript Display */}
+                  <AnimatePresence>
+                    {displayMessages.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-4"
+                      >
+                        <ScrollArea className="h-64 rounded-lg bg-background/50 p-4">
+                          <div className="space-y-4">
+                            {displayMessages.map((msg, index) => (
+                              <motion.div
+                                key={index}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className={`flex gap-3 ${
+                                  msg.role === 'user' ? 'justify-end' : 'justify-start'
+                                }`}
+                              >
+                                {msg.role === 'assistant' && (
+                                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                                    <Bot className="w-4 h-4 text-white" />
+                                  </div>
+                                )}
+                                <div
+                                  className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                                    msg.role === 'user'
+                                      ? 'bg-violet-500 text-white'
+                                      : 'bg-muted'
                                   }`}
                                 >
-                                  {msg.role === 'assistant' && (
-                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                                      <Bot className="w-3 h-3 text-white" />
-                                    </div>
-                                  )}
-                                  <div
-                                    className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
-                                      msg.role === 'user'
-                                        ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white'
-                                        : 'glass'
-                                    }`}
-                                  >
-                                    {msg.content}
+                                  <p className="text-sm">{msg.content}</p>
+                                </div>
+                                {msg.role === 'user' && (
+                                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                                    <User className="w-4 h-4" />
                                   </div>
-                                  {msg.role === 'user' && (
-                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                                      <User className="w-3 h-3 text-white" />
-                                    </div>
-                                  )}
-                                </motion.div>
-                              ))}
-                            </AnimatePresence>
+                                )}
+                              </motion.div>
+                            ))}
                           </div>
-                        )}
-                      </ScrollArea>
-                    </div>
-                  </SignedIn>
+                        </ScrollArea>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </CardContent>
               </Card>
+              
+              {/* Decorative elements */}
+              <div className="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%]">
+                <div className="absolute inset-0 bg-gradient-to-r from-violet-500/20 to-purple-500/20 blur-3xl rounded-full" />
+              </div>
             </motion.div>
           </div>
         </section>
 
         {/* Features Section */}
-        <section className="container py-24">
+        <section id="features" className="container py-24">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              Why Choose <span className="gradient-text">AI Policy Whisperer</span>?
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Everything You Need to{" "}
+              <span className="text-gradient">Understand AI Policies</span>
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Our AI-powered platform helps you navigate the complex world of AI policies with ease and confidence.
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Our AI-powered assistant helps you navigate the complex landscape of AI regulations and platform policies.
             </p>
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature, index) => (
               <motion.div
-                key={index}
+                key={feature.title}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
+                transition={{ delay: index * 0.1 }}
               >
-                <Card className="glass border-0 hover:shadow-elevated transition-all duration-300 h-full rounded-2xl group">
-                  <CardContent className="p-6">
+                <Card className="glass-card h-full hover:shadow-lg transition-shadow">
+                  <CardContent className="p-6 flex flex-col items-center text-center">
                     <Icon3D icon={feature.icon} variant={feature.variant} size="lg" className="mb-4" />
                     <h3 className="font-semibold text-lg mb-2">{feature.title}</h3>
                     <p className="text-sm text-muted-foreground">{feature.description}</p>
@@ -463,13 +524,12 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              How It <span className="gradient-text">Works</span>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              How It <span className="text-gradient">Works</span>
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Get started in minutes with our simple three-step process.
             </p>
           </motion.div>
@@ -477,23 +537,23 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-8">
             {howItWorks.map((item, index) => (
               <motion.div
-                key={index}
+                key={item.step}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.15 }}
+                transition={{ delay: index * 0.1 }}
                 className="relative"
               >
-                <Card className="glass border-0 rounded-2xl h-full">
-                  <CardContent className="p-8">
-                    <div className="text-5xl font-bold gradient-text mb-4">{item.step}</div>
-                    <h3 className="font-semibold text-xl mb-3">{item.title}</h3>
+                <Card className="glass-card h-full">
+                  <CardContent className="p-6">
+                    <div className="text-5xl font-bold text-violet-500/20 mb-4">{item.step}</div>
+                    <h3 className="font-semibold text-xl mb-2">{item.title}</h3>
                     <p className="text-muted-foreground">{item.description}</p>
                   </CardContent>
                 </Card>
                 {index < howItWorks.length - 1 && (
-                  <div className="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2 z-10">
-                    <ArrowRight className="w-8 h-8 text-primary/30" />
+                  <div className="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2">
+                    <ArrowRight className="w-8 h-8 text-violet-500/30" />
                   </div>
                 )}
               </motion.div>
@@ -507,33 +567,32 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              Policy Areas We <span className="gradient-text">Cover</span>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Policy Areas We <span className="text-gradient">Cover</span>
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Comprehensive coverage of AI policies across multiple domains and platforms.
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              From ethics to regulations, we've got you covered across all major AI policy domains.
             </p>
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {policyAreas.map((area, index) => (
               <motion.div
-                key={index}
+                key={area.title}
                 initial={{ opacity: 0, scale: 0.95 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: index * 0.08 }}
+                transition={{ delay: index * 0.05 }}
               >
-                <Card className="glass border-0 rounded-xl hover:shadow-elevated transition-all duration-300 cursor-pointer group">
-                  <CardContent className="p-5 flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500/20 to-purple-600/20 flex items-center justify-center flex-shrink-0 group-hover:from-violet-500/30 group-hover:to-purple-600/30 transition-colors">
-                      <Check className="w-5 h-5 text-primary" />
+                <Card className="glass-card hover:shadow-md transition-all hover:scale-[1.02]">
+                  <CardContent className="p-4 flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center">
+                      <Check className="w-5 h-5 text-violet-500" />
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-1">{area.title}</h3>
+                      <h3 className="font-medium">{area.title}</h3>
                       <p className="text-sm text-muted-foreground">{area.description}</p>
                     </div>
                   </CardContent>
@@ -549,37 +608,36 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              Trusted by <span className="gradient-text">Professionals</span>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Trusted by <span className="text-gradient">Industry Leaders</span>
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              See what industry leaders are saying about AI Policy Whisperer.
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              See what professionals are saying about AI Policy Whisperer.
             </p>
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-6">
             {testimonials.map((testimonial, index) => (
               <motion.div
-                key={index}
+                key={testimonial.author}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
+                transition={{ delay: index * 0.1 }}
               >
-                <Card className="glass border-0 rounded-2xl h-full">
+                <Card className="glass-card h-full">
                   <CardContent className="p-6">
-                    <Quote className="w-8 h-8 text-primary/30 mb-4" />
+                    <Quote className="w-8 h-8 text-violet-500/30 mb-4" />
                     <p className="text-muted-foreground mb-6 italic">"{testimonial.quote}"</p>
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm">
                         {testimonial.avatar}
                       </div>
                       <div>
-                        <p className="font-semibold text-sm">{testimonial.author}</p>
-                        <p className="text-xs text-muted-foreground">{testimonial.role}</p>
+                        <p className="font-medium">{testimonial.author}</p>
+                        <p className="text-sm text-muted-foreground">{testimonial.role}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -595,32 +653,34 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
           >
-            <Card className="glass-strong border-0 rounded-3xl overflow-hidden">
-              <CardContent className="p-8 sm:p-12 text-center">
-                <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                  Ready to Navigate AI Policies with <span className="gradient-text">Ease</span>?
-                </h2>
-                <p className="text-muted-foreground max-w-2xl mx-auto mb-8">
-                  Join thousands of professionals who trust AI Policy Whisperer for clear, accurate policy guidance.
-                </p>
-                <SignedOut>
-                  <SignUpButton mode="modal">
-                    <Button size="lg" className="gap-2 btn-gradient rounded-full px-10 h-14 text-lg">
-                      Get Started Free
-                      <ArrowRight className="w-5 h-5" />
-                    </Button>
-                  </SignUpButton>
-                </SignedOut>
-                <SignedIn>
-                  <Link href="/history">
-                    <Button size="lg" className="gap-2 btn-gradient rounded-full px-10 h-14 text-lg">
-                      View Your Conversations
-                      <ArrowRight className="w-5 h-5" />
-                    </Button>
-                  </Link>
-                </SignedIn>
+            <Card className="glass-card overflow-hidden">
+              <CardContent className="p-12 text-center relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-violet-500/10 to-purple-500/10" />
+                <div className="relative z-10">
+                  <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                    Ready to Master AI Policies?
+                  </h2>
+                  <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
+                    Join thousands of professionals who trust AI Policy Whisperer for their policy questions.
+                  </p>
+                  <SignedOut>
+                    <SignUpButton mode="modal">
+                      <Button size="lg" className="gap-2 btn-gradient rounded-full px-8">
+                        Get Started Free
+                        <ArrowRight className="w-4 h-4" />
+                      </Button>
+                    </SignUpButton>
+                  </SignedOut>
+                  <SignedIn>
+                    <Link href="/history">
+                      <Button size="lg" className="gap-2 btn-gradient rounded-full px-8">
+                        View Your Conversations
+                        <ArrowRight className="w-4 h-4" />
+                      </Button>
+                    </Link>
+                  </SignedIn>
+                </div>
               </CardContent>
             </Card>
           </motion.div>
@@ -629,12 +689,12 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t border-border/50 py-8">
-        <div className="container flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="container flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
-            <span className="text-sm font-medium">AI Policy Whisperer</span>
+            <span className="font-medium">AI Policy Whisperer</span>
           </div>
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} AI Policy Whisperer. All rights reserved.

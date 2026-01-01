@@ -107,3 +107,21 @@
 - [ ] Update VITE_SUPABASE_ANON_KEY to new key
 - [ ] Push changes to fix/supabase-chat-history branch
 - [ ] Verify conversations and messages tables exist in new Supabase project
+
+## VoicePoweredOrb UI - December 24, 2025
+- [x] Install OGL dependency for WebGL rendering
+- [x] Create VoicePoweredOrb component with voice-reactive animation
+- [x] Create CSS-based AnimatedOrb as reliable fallback
+- [x] Adapt colors to match AI Policy Whisperer branding (purple gradient)
+- [x] Integrate with existing ElevenLabs voice agent on Home page
+- [x] Test voice recording UI
+- [x] Push to new branch on GitHub (voice-orb-ui)
+
+## AI-Generated Conversation Titles - January 1, 2026
+- [x] Review existing title logic and document limitations
+- [x] Create AI title generation service with few-shot examples
+- [x] Implement title replacement logic with smart refresh triggers
+- [x] Update Supabase schema if needed for AI-generated titles (no changes needed)
+- [x] Update UI to display AI-generated titles (already displays from database)
+- [x] Test across short/long, single/multi-topic conversations (14 unit tests passing)
+- [x] Push to new branch on GitHub (feature/ai-generated-titles)
