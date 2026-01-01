@@ -38,7 +38,21 @@ interface ElevenLabsMessage {
   };
 }
 
-export function useVoiceAgent(onTranscriptUpdate?: (transcript: TranscriptEntry[]) => void): UseVoiceAgentReturn {
+export interface UseVoiceAgentOptions {
+  onTranscriptUpdate?: (transcript: TranscriptEntry[]) => void;
+  onSessionEnd?: (transcript: TranscriptEntry[]) => void;
+}
+
+export function useVoiceAgent(
+  onTranscriptUpdateOrOptions?: ((transcript: TranscriptEntry[]) => void) | UseVoiceAgentOptions
+): UseVoiceAgentReturn {
+  // Handle both old and new API
+  const options: UseVoiceAgentOptions = typeof onTranscriptUpdateOrOptions === 'function'
+    ? { onTranscriptUpdate: onTranscriptUpdateOrOptions }
+    : onTranscriptUpdateOrOptions || {};
+  
+  const { onTranscriptUpdate, onSessionEnd } = options;
+
   const [status, setStatus] = useState<VoiceAgentStatus>('idle');
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
@@ -46,11 +60,16 @@ export function useVoiceAgent(onTranscriptUpdate?: (transcript: TranscriptEntry[
   
   const conversationRef = useRef<Conversation | null>(null);
   const transcriptRef = useRef<TranscriptEntry[]>([]);
+  const onSessionEndRef = useRef(onSessionEnd);
 
-  // Keep transcriptRef in sync
+  // Keep refs in sync
   useEffect(() => {
     transcriptRef.current = transcript;
   }, [transcript]);
+
+  useEffect(() => {
+    onSessionEndRef.current = onSessionEnd;
+  }, [onSessionEnd]);
 
   const addTranscriptEntry = useCallback((entry: TranscriptEntry) => {
     setTranscript(prev => {
@@ -85,6 +104,12 @@ export function useVoiceAgent(onTranscriptUpdate?: (transcript: TranscriptEntry[
           setStatus('idle');
           setIsSessionActive(false);
           conversationRef.current = null;
+          
+          // Call onSessionEnd with the final transcript
+          if (onSessionEndRef.current && transcriptRef.current.length > 0) {
+            console.log('[ElevenLabs] Calling onSessionEnd with', transcriptRef.current.length, 'messages');
+            onSessionEndRef.current(transcriptRef.current);
+          }
         },
         onError: (errorMsg) => {
           console.error('[ElevenLabs] Error:', errorMsg);
@@ -171,6 +196,12 @@ export function useVoiceAgent(onTranscriptUpdate?: (transcript: TranscriptEntry[
       }
       setStatus('idle');
       setIsSessionActive(false);
+      
+      // Call onSessionEnd with the final transcript (also called in onDisconnect, but this ensures it's called)
+      if (onSessionEndRef.current && transcriptRef.current.length > 0) {
+        console.log('[ElevenLabs] Calling onSessionEnd from stopSession with', transcriptRef.current.length, 'messages');
+        onSessionEndRef.current(transcriptRef.current);
+      }
     } catch (err) {
       console.error('[ElevenLabs] Failed to stop voice session:', err);
       setError(err instanceof Error ? err.message : 'Failed to stop voice session');
