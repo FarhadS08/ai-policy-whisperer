@@ -151,6 +151,38 @@ export const appRouter = router({
         return { success: true, title: newTitle };
       }),
 
+    // Search conversations by title
+    search: protectedProcedure
+      .input(z.object({
+        query: z.string(),
+      }))
+      .query(async ({ ctx, input }) => {
+        const searchQuery = input.query.trim().toLowerCase();
+        
+        if (!searchQuery) {
+          // Return all conversations if no search query
+          const { data, error } = await supabase
+            .from('conversations')
+            .select('*')
+            .eq('user_id', ctx.user.id)
+            .order('updated_at', { ascending: false });
+
+          if (error) throw new Error(error.message);
+          return data || [];
+        }
+
+        // Search by title using ilike for case-insensitive matching
+        const { data, error } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('user_id', ctx.user.id)
+          .ilike('title', `%${searchQuery}%`)
+          .order('updated_at', { ascending: false });
+
+        if (error) throw new Error(error.message);
+        return data || [];
+      }),
+
     // Delete a conversation
     delete: protectedProcedure
       .input(z.object({ id: z.string().uuid() }))
