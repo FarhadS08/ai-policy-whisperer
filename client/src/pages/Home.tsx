@@ -35,6 +35,14 @@ import { Link } from "wouter";
 import { useState, useCallback, useRef, useMemo } from "react";
 import * as supabaseService from "@/services/supabaseService";
 
+/**
+ * Render the Home page, including the voice conversation interface, feature sections, and auth-dependent actions.
+ *
+ * Manages voice session state, displays live transcripts, persists conversation messages for authenticated users,
+ * and triggers AI-generated conversation titles when a session ends. Also provides theme toggling and navigation UI.
+ *
+ * @returns The Home page React element tree
+ */
 export default function Home() {
   const { userId, isSignedIn } = useAuth();
   const user = userId ? { id: userId } : null;

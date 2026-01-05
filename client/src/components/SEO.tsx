@@ -10,14 +10,14 @@ interface SEOProps {
 }
 
 /**
- * SEO Component - Updates document head with page-specific meta tags
- * 
- * Usage:
- * <SEO 
- *   title="Page Title | Plaindr"
- *   description="Page description for search engines"
- *   robots="index, follow"
- * />
+ * Synchronizes the document head's title, meta tags (standard, Open Graph, Twitter), and canonical link based on the provided props.
+ *
+ * @param title - Page title to set as document.title and for meta tags
+ * @param description - Page description for meta and social preview tags
+ * @param robots - Value for the `robots` meta tag; defaults to "index, follow"
+ * @param canonical - Optional canonical URL to set on a `link[rel="canonical"]` element
+ * @param ogType - Open Graph `og:type` value; defaults to "website"
+ * @param ogImage - URL for Open Graph and Twitter preview image; defaults to "/og-image.png"
  */
 export function SEO({
   title,

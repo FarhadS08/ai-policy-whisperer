@@ -61,6 +61,14 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { SEO, SEO_CONFIG } from "@/components/SEO";
 
+/**
+ * Render the Conversation History page with authentication-aware sidebar, search, tag filters, bulk actions, and chat view.
+ *
+ * Displays a sign-in prompt when the user is not authenticated and, when signed in, provides a conversation management interface:
+ * conversation list with search and tag filtering, inline title editing and regeneration, message viewer, bulk tag add/remove actions, and delete confirmation.
+ *
+ * @returns The rendered History page JSX element.
+ */
 export default function History() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
