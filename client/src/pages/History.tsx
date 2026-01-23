@@ -5,14 +5,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  ArrowLeft, 
-  MessageSquare, 
-  Trash2, 
-  Clock, 
-  User, 
+import {
+  ArrowLeft,
+  MessageSquare,
+  Trash2,
+  Clock,
+  User,
   Bot,
-  Sparkles,
   Moon,
   Sun,
   ChevronRight,
@@ -362,9 +361,11 @@ export default function History() {
                 </Button>
               </Link>
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
-                  <Sparkles className="w-5 h-5 text-white" />
-                </div>
+                <img
+                  src={theme === 'dark' ? '/plaindrlogotypebw/Plaindr_logo_ICON_white.svg' : '/plaindrlogotypebw/Plaindr_logo_ICON_black.svg'}
+                  alt="Plaindr"
+                  className="h-8 w-auto"
+                />
                 <span className="font-semibold text-lg">Conversation History</span>
               </div>
             </div>
@@ -433,9 +434,11 @@ export default function History() {
                 {/* Sidebar Header */}
                 <div className="flex items-center justify-between p-4 border-b border-border/50">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
-                      <Sparkles className="w-5 h-5 text-white" />
-                    </div>
+                    <img
+                      src={theme === 'dark' ? '/plaindrlogotypebw/Plaindr_logo_ICON_white.svg' : '/plaindrlogotypebw/Plaindr_logo_ICON_black.svg'}
+                      alt="Plaindr"
+                      className="h-8 w-auto"
+                    />
                     <span className="font-semibold">Conversations</span>
                   </div>
                   <Button
