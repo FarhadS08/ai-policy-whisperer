@@ -249,7 +249,7 @@ export default function Home() {
 
   const testimonials = [
     {
-      quote: "AI Policy Whisperer has transformed how our team navigates complex AI regulations. It's like having a policy expert on call 24/7.",
+      quote: "Plaindr has transformed how our team navigates complex AI regulations. It's like having a policy expert on call 24/7.",
       author: "Sarah Chen",
       role: "Head of Compliance, TechCorp",
       avatar: "SC"
@@ -290,10 +290,11 @@ export default function Home() {
       <header className="fixed top-0 left-0 right-0 z-50 glass-nav">
         <div className="container flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-semibold text-lg">AI Policy Whisperer</span>
+            <img
+              src={theme === 'dark' ? '/plaindrlogotypebw/Plaindr_logo_B&W-02.svg' : '/plaindrlogotypebw/Plaindr_logo_B&W-01.svg'}
+              alt="Plaindr"
+              className="h-8 w-auto"
+            />
           </Link>
           
           <div className="flex items-center gap-3">
@@ -688,7 +689,7 @@ export default function Home() {
               Trusted by <span className="text-gradient">Industry Leaders</span>
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              See what professionals are saying about AI Policy Whisperer.
+              See what professionals are saying about Plaindr.
             </p>
           </motion.div>
 
@@ -736,7 +737,7 @@ export default function Home() {
                     Ready to Master AI Policies?
                   </h2>
                   <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-                    Join thousands of professionals who trust AI Policy Whisperer for their policy questions.
+                    Join thousands of professionals who trust Plaindr for their policy questions.
                   </p>
                   <SignedOut>
                     <SignUpButton mode="modal">
@@ -765,13 +766,14 @@ export default function Home() {
       <footer className="border-t border-border/50 py-8">
         <div className="container flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-medium">AI Policy Whisperer</span>
+            <img
+              src={theme === 'dark' ? '/plaindrlogotypebw/Plaindr_logo_B&W-02.svg' : '/plaindrlogotypebw/Plaindr_logo_B&W-01.svg'}
+              alt="Plaindr"
+              className="h-6 w-auto"
+            />
           </div>
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} AI Policy Whisperer. All rights reserved.
+            © {new Date().getFullYear()} Plaindr. All rights reserved.
           </p>
         </div>
       </footer>

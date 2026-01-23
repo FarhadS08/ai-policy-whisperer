@@ -18,7 +18,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
-  Sparkles,
   Moon,
   Sun,
   ChevronRight,
@@ -167,8 +166,8 @@ export default function Profile() {
   return (
     <>
       <SEO
-        title="Profile | AI Policy Whisperer"
-        description="Manage your AI Policy Whisperer profile and preferences"
+        title="Profile | Plaindr"
+        description="Manage your Plaindr profile and preferences"
         robots="noindex, nofollow"
         canonical="https://plaindr.com/profile"
       />
@@ -183,9 +182,11 @@ export default function Profile() {
                 </Button>
               </Link>
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
-                  <Sparkles className="w-5 h-5 text-white" />
-                </div>
+                <img
+                  src={theme === 'dark' ? '/plaindrlogotypebw/Plaindr_logo_ICON_white.svg' : '/plaindrlogotypebw/Plaindr_logo_ICON_black.svg'}
+                  alt="Plaindr"
+                  className="h-8 w-auto"
+                />
                 <span className="font-semibold text-lg">Profile</span>
               </div>
             </div>
